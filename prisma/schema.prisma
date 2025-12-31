@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  posts     Post[]
+  accounts  Account[]
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  caption     String
+  imageUrls   String[]
+  scheduledAt DateTime?
+  status      String   @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHED, FAILED
+  mediaType   String   @default("IMAGE") // IMAGE, REEL
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  instagramPostId String?
+}
+
+model Account {
+  id           String @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  instagramId  String   @unique
+  accessToken  String
+  username     String?
+  picture      String?
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+
+}
