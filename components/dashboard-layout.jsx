@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LayoutDashboard, PlusCircle, ImageIcon, Settings, Menu, X, Sparkles, Moon, Sun, LogOut, Instagram, Grid3X3 } from "lucide-react"
+import { LayoutDashboard, PlusCircle, ImageIcon, Settings, Menu, X, Sparkles, Moon, Sun, LogOut, Instagram, Grid3X3, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
@@ -22,6 +22,7 @@ const navigation = [
   { name: "Create Post", href: "/create", icon: PlusCircle },
   { name: "All Posts", href: "/all-posts", icon: Grid3X3 },
   { name: "Templates", href: "/templates", icon: ImageIcon },
+  { name: "Trending", href: "/trending", icon: TrendingUp },
   { name: "Connect Instagram", href: "/connect-instagram", icon: Instagram },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
