@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Download, Heart, MessageCircle, Eye, Share2, Play } from "lucide-react"
+import { Download, Heart, MessageCircle, Eye, Share2, Play, FileUp as FileInput } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getDownloadLink } from "@/app/actions/tiktok"
 
@@ -50,9 +50,52 @@ function formatDuration(seconds: number): string {
     return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+import { useRouter } from "next/navigation"
+import { automationStore } from "@/lib/automation-store"
+
 export default function VideoCard({ video }: VideoCardProps) {
     const { toast } = useToast()
+    const router = useRouter()
     const [downloading, setDownloading] = useState(false)
+    const [importing, setImporting] = useState(false)
+
+    const handleImport = async () => {
+        setImporting(true)
+        try {
+            // 1. Get authorized link
+            const result = await getDownloadLink(video.share_url)
+            if (result.error || !result.downloadUrl) {
+                throw new Error(result.error || 'Could not get authorized download link')
+            }
+
+            // 2. Fetch the video blob
+            const response = await fetch(result.downloadUrl)
+            if (!response.ok) throw new Error('Failed to download video file')
+            const blob = await response.blob()
+
+            // 3. Store in automation store
+            automationStore.setMedia(blob, {
+                description: video.title || video.description,
+                author: video.author.nickname
+            })
+
+            // 4. Redirect to Create page
+            toast({
+                title: "Importing...",
+                description: "Redirecting to create post..."
+            })
+            router.push('/create')
+
+        } catch (error) {
+            console.error('Import error:', error)
+            toast({
+                title: "Import Failed",
+                description: error instanceof Error ? error.message : "Could not import video.",
+                variant: "destructive"
+            })
+            setImporting(false)
+        }
+    }
 
     const handleDownload = async () => {
         setDownloading(true)
@@ -157,15 +200,26 @@ export default function VideoCard({ video }: VideoCardProps) {
                     </div>
                 </div>
 
-                {/* Download Button */}
-                <Button
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className="w-full instagram-gradient text-white"
-                >
-                    <Download className="w-4 h-4 mr-2" />
-                    {downloading ? "Downloading..." : "Download Video"}
-                </Button>
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                    <Button
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        {downloading ? "Wait..." : "Download"}
+                    </Button>
+
+                    <Button
+                        onClick={handleImport}
+                        disabled={importing}
+                        className="w-full instagram-gradient text-white"
+                    >
+                        <FileInput className="w-4 h-4 mr-2" />
+                        {importing ? "Importing..." : "Use This"}
+                    </Button>
+                </div>
             </div>
         </Card>
     )

@@ -42,3 +42,11 @@ model Account {
   userId       String
 
 }
+
+model SearchCache {
+  id        String   @id @default(uuid())
+  query     String   @unique
+  results   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

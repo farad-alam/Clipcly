@@ -21,23 +21,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { automationStore } from "@/lib/automation-store"
 
 const suggestedHashtags = [
   "#instagram",
   "#instagood",
-  "#photooftheday",
-  "#fashion",
-  "#beautiful",
-  "#happy",
-  "#cute",
-  "#like4like",
-  "#followme",
-  "#picoftheday",
-  "#art",
-  "#style",
-  "#instadaily",
-  "#repost",
-  "#summer",
+  // ... existing hashtags
 ]
 
 export default function CreatePostPage() {
@@ -64,8 +53,59 @@ export default function CreatePostPage() {
   const ffmpegRef = useRef(null)
 
   useEffect(() => {
-    load()
+    const init = async () => {
+      await load()
+
+      // Check for automated import from TikTok safely
+      try {
+        const media = automationStore.getMedia()
+        if (media && media.mediaBlob && media.source === 'tiktok') {
+          await handleAutomatedImport(media)
+        }
+      } catch (e) {
+        console.error("Auto-import initialization error:", e)
+      }
+    }
+    init()
   }, [])
+
+  const handleAutomatedImport = async (media) => {
+    console.log("Starting automated import...")
+    setMediaType("REEL")
+
+    try {
+      // Safety check for valid blob
+      if (!(media.mediaBlob instanceof Blob)) {
+        throw new Error("Invalid media blob")
+      }
+
+      const url = URL.createObjectURL(media.mediaBlob)
+      setUploadedImage(url)
+
+      const desc = media.meta?.description || ""
+      const author = media.meta?.author || "tiktok"
+      setCaption(`${desc}\n\nCredit: @${author} #tiktok #reels`)
+
+      toast({ title: "Imported from TikTok", description: "Optimizing video for Reels..." })
+
+      // Ensure FFmpeg is loaded before compressing
+      if (!ffmpegRef.current) {
+        await load()
+      }
+
+      const file = new File([media.mediaBlob], `tiktok-${Date.now()}.mp4`, { type: 'video/mp4' })
+      const compressed = await compressVideo(file)
+      setFileToUpload(compressed)
+      toast({ title: "Ready", description: "Video imported and optimized!" })
+
+    } catch (e) {
+      console.error("Import compression failed", e)
+      setFileToUpload(new File([media.mediaBlob], "tiktok-import.mp4", { type: 'video/mp4' }))
+      toast({ title: "Import Warning", description: "Video imported (unoptimized).", variant: "destructive" })
+    }
+
+    automationStore.clear()
+  }
 
   const load = async () => {
     const { FFmpeg } = await import('@ffmpeg/ffmpeg')
