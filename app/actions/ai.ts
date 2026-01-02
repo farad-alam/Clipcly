@@ -40,3 +40,37 @@ export async function generateCaption(topic: string, tone: string) {
         return { error: 'Failed to generate content. Please try again.' }
     }
 }
+
+export async function rewriteCaption(originalCaption: string): Promise<string> {
+    if (!process.env.GEMINI_API_KEY) {
+        console.warn("Gemini API Key missing. Skipping caption rewrite.");
+        return originalCaption;
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+        const prompt = `
+        You are an Instagram social media manager.
+        Rewrite the following TikTok caption for an Instagram Reel.
+        
+        Rules:
+        1. Remove any @mentions of other users.
+        2. Make it engaging and catchy.
+        3. Maintain the original context/meaning.
+        4. Keep relevant hashtags or add better ones (max 5-7 hashtags).
+        5. Return ONLY the new caption text, nothing else.
+        
+        Original Caption: "${originalCaption}"
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        return text.trim() || originalCaption;
+    } catch (error) {
+        console.error("Gemini Caption Rewrite Error:", error);
+        return originalCaption; // Fallback to original
+    }
+}

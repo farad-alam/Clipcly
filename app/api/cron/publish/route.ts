@@ -1,13 +1,21 @@
 
 import { prisma } from '@/lib/prisma';
 import { InstagramClient } from '@/lib/instagram';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // 0. Security Check
+    const authHeader = req.headers.get('authorization')
+    // We allow either a valid Cron Secret OR a valid Clerk user (for manual UI triggering)
+    const { userId } = await auth();
+
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
         const now = new Date();
-        const { userId } = await auth();
 
         // 1. Find scheduled posts that are due
         // Filter by user if authenticated (manual trigger safe mode)

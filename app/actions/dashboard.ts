@@ -14,7 +14,15 @@ export async function getDashboardData() {
         const posts = await prisma.post.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' },
-            take: 10
+            take: 20
+        })
+
+        const automationTasks = await prisma.automationQueue.findMany({
+            where: {
+                userId,
+                status: { in: ['PENDING', 'PROCESSING', 'FAILED'] }
+            },
+            orderBy: { scheduledAt: 'asc' }
         })
 
         const totalPosts = await prisma.post.count({ where: { userId } })
@@ -37,22 +45,39 @@ export async function getDashboardData() {
             }
         })
 
-        // Mock analytics for now as we don't have Instagram API connected yet
-        const engagement = "0"
-        const comments = "0"
+        // Combine regular posts with automation tasks for the calendar
+        const combinedPosts = [
+            ...posts.map(p => ({
+                id: p.id,
+                caption: p.caption,
+                imageUrls: p.imageUrls,
+                scheduledAt: p.scheduledAt,
+                status: p.status,
+                createdAt: p.createdAt,
+                // Detection: Automation posts have a specific credit signature
+                isAutomation: p.caption.includes('Credit: @') && p.caption.includes('#reels'),
+                image: p.imageUrls[0] || null
+            })),
+            ...automationTasks.map(t => ({
+                id: t.id,
+                caption: (t.videoMeta as any).title || t.videoUrl,
+                imageUrls: [(t.videoMeta as any).cover],
+                scheduledAt: t.scheduledAt,
+                status: t.status, // PENDING, PROCESSING, FAILED
+                createdAt: t.createdAt,
+                isAutomation: true,
+                image: (t.videoMeta as any).cover || null
+            }))
+        ]
 
         return {
             stats: {
                 totalPosts,
                 published: publishedPostsCount,
-                scheduled: scheduledPostsCount,
+                scheduled: scheduledPostsCount + automationTasks.filter(t => t.status === 'PENDING').length,
                 drafts: draftPostsCount
             },
-            posts: posts.map(p => ({
-                ...p,
-                scheduledFor: p.scheduledAt ? p.scheduledAt.toLocaleString() : 'Not scheduled',
-                image: p.imageUrls[0] || null
-            }))
+            posts: combinedPosts
         }
     } catch (error) {
         console.error('Dashboard Data Error:', error)

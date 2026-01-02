@@ -14,6 +14,7 @@ model User {
   posts     Post[]
   accounts  Account[]
   createdAt DateTime @default(now())
+  automationQueue AutomationQueue[]
 }
 
 model Post {
@@ -49,4 +50,17 @@ model SearchCache {
   results   Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AutomationQueue {
+  id          String   @id @default(uuid())
+  videoUrl    String
+  videoMeta   Json
+  scheduledAt DateTime
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  logs        String?
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

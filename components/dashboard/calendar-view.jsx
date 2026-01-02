@@ -23,21 +23,38 @@ export function CalendarView({ posts = [], onRefresh }) {
     const [isUpdating, setIsUpdating] = useState(false)
 
     // Transform posts to FullCalendar events
-    const events = posts.map(post => ({
-        id: post.id,
-        title: post.caption.substring(0, 20) + (post.caption.length > 20 ? '...' : ''),
-        date: post.scheduledAt || post.createdAt,
-        // Add visual cues based on status
-        backgroundColor: post.status === 'PUBLISHED' ? '#10b981' : '#3b82f6',
-        borderColor: post.status === 'PUBLISHED' ? '#10b981' : '#3b82f6',
-        classNames: post.status === 'PUBLISHED' ? ['published-event'] : ['scheduled-event'],
-        extendedProps: {
-            imageUrl: post.imageUrls?.[0],
-            status: post.status,
-            caption: post.caption,
-            scheduledAt: post.scheduledAt
+    const events = posts.map(post => {
+        const isAutomation = post.isAutomation;
+        let color = '#3b82f6'; // Default brand blue for manual scheduled posts
+        let titlePrefix = isAutomation ? '🤖 ' : '';
+
+        // Unified Color Logic
+        if (post.status === 'PUBLISHED' || post.status === 'COMPLETED') {
+            color = '#10b981'; // Success Green
+        } else if (post.status === 'FAILED') {
+            color = '#ef4444'; // Error Red
+        } else if (post.status === 'PROCESSING') {
+            color = '#f59e0b'; // Transition Amber
+        } else if (isAutomation && post.status === 'PENDING') {
+            color = '#6366f1'; // Automation Indigo
         }
-    }))
+
+        return {
+            id: post.id,
+            title: titlePrefix + post.caption.substring(0, 20) + (post.caption.length > 20 ? '...' : ''),
+            date: post.scheduledAt || post.createdAt,
+            backgroundColor: color,
+            borderColor: color,
+            classNames: post.status === 'PUBLISHED' ? ['published-event'] : ['scheduled-event'],
+            extendedProps: {
+                imageUrl: post.imageUrls?.[0],
+                status: post.status,
+                caption: post.caption,
+                scheduledAt: post.scheduledAt,
+                isAutomation: isAutomation
+            }
+        }
+    })
 
     const handleEventDrop = async (info) => {
         // Optimistic update handled by FullCalendar automatically for the UI

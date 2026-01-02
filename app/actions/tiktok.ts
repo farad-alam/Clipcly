@@ -12,13 +12,13 @@ export async function searchVideos(keyword: string) {
     const normalizedKeyword = keyword.trim().toLowerCase()
 
     try {
-        // 1. Check Cache (valid for 24 hours)
+        // 1. Check Cache (valid for 3 days / 72 hours)
         const cached = await prisma.searchCache.findUnique({
             where: { query: normalizedKeyword }
         })
 
         if (cached) {
-            const isAhFresh = (new Date().getTime() - new Date(cached.updatedAt).getTime()) < 24 * 60 * 60 * 1000
+            const isAhFresh = (new Date().getTime() - new Date(cached.updatedAt).getTime()) < 72 * 60 * 60 * 1000
             if (isAhFresh) {
                 console.log(`[CACHE HIT] Found ${normalizedKeyword}`)
                 // Parse JSON if needed or just cast it, prisma handles Json type as object usually
@@ -52,8 +52,40 @@ export async function searchVideos(keyword: string) {
 }
 
 export async function fetchTrending() {
+    const CACHE_KEY = '__TRENDING_GLOBAL__'
+    const CACHE_STALE_TIME = 72 * 60 * 60 * 1000 // 3 days
+
     try {
+        // 1. Check Cache
+        const cached = await prisma.searchCache.findUnique({
+            where: { query: CACHE_KEY }
+        })
+
+        if (cached) {
+            const isAhFresh = (new Date().getTime() - new Date(cached.updatedAt).getTime()) < CACHE_STALE_TIME
+            if (isAhFresh) {
+                console.log(`[CACHE HIT] Found Global Trending`)
+                return { success: true, videos: cached.results }
+            }
+        }
+
+        // 2. Fetch if stale
+        console.log(`[API FETCH] Loading Global Trending`)
         const videos = await getTrendingVideos()
+
+        // 3. Save to Cache
+        await prisma.searchCache.upsert({
+            where: { query: CACHE_KEY },
+            update: {
+                results: videos as any,
+                updatedAt: new Date()
+            },
+            create: {
+                query: CACHE_KEY,
+                results: videos as any
+            }
+        })
+
         return { success: true, videos }
     } catch (error) {
         console.error('Fetch Trending Error:', error)

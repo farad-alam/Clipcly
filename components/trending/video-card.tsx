@@ -52,6 +52,7 @@ function formatDuration(seconds: number): string {
 
 import { useRouter } from "next/navigation"
 import { automationStore } from "@/lib/automation-store"
+import { VideoSchedulePopover } from "./video-schedule-popover"
 
 export default function VideoCard({ video }: VideoCardProps) {
     const { toast } = useToast()
@@ -201,24 +202,37 @@ export default function VideoCard({ video }: VideoCardProps) {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                    <Button
-                        onClick={handleDownload}
-                        disabled={downloading}
-                        className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        {downloading ? "Wait..." : "Download"}
-                    </Button>
+                <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button
+                            onClick={handleDownload}
+                            disabled={downloading}
+                            className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                            size="sm"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            To PC
+                        </Button>
 
-                    <Button
-                        onClick={handleImport}
-                        disabled={importing}
-                        className="w-full instagram-gradient text-white"
-                    >
-                        <FileInput className="w-4 h-4 mr-2" />
-                        {importing ? "Importing..." : "Use This"}
-                    </Button>
+                        <Button
+                            onClick={handleImport}
+                            disabled={importing}
+                            className="w-full instagram-gradient text-white"
+                            size="sm"
+                        >
+                            <FileInput className="w-4 h-4 mr-2" />
+                            Create
+                        </Button>
+                    </div>
+
+                    <VideoSchedulePopover
+                        videoUrl={video.share_url}
+                        meta={{
+                            title: video.description || video.title,
+                            author: video.author?.nickname || "unknown",
+                            duration: video.duration
+                        }}
+                    />
                 </div>
             </div>
         </Card>
