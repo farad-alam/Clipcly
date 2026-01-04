@@ -74,3 +74,55 @@ export async function rewriteCaption(originalCaption: string): Promise<string> {
         return originalCaption; // Fallback to original
     }
 }
+
+export async function analyzeAudio(audioBase64: string) {
+    if (!process.env.GEMINI_API_KEY) {
+        return { error: 'Gemini API Key is missing' }
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+        const prompt = `
+        Analyze this audio clip and determine if it contains Music, Speech, or Both.
+        
+        Return a JSON object strictly in this format:
+        {
+            "hasMusic": boolean,
+            "hasSpeech": boolean,
+            "confidence": number (0-1),
+            "description": "Short 1 sentence description of the audio content"
+        }
+        
+        Do not acknowledge the request, just return the JSON.
+        `;
+
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    mimeType: "audio/mp3",
+                    data: audioBase64
+                }
+            }
+        ]);
+
+        const response = await result.response;
+        const text = response.text();
+
+        // Clean up markdown code blocks if present
+        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        try {
+            const data = JSON.parse(jsonStr);
+            return { success: true, data };
+        } catch (e) {
+            console.error("Failed to parse Gemini response:", text);
+            return { error: "Failed to parse analysis result" };
+        }
+
+    } catch (error) {
+        console.error('Gemini Audio Analysis Error:', error)
+        return { error: 'Failed to analyze audio.' }
+    }
+}

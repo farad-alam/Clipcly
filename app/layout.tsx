@@ -80,6 +80,7 @@ export const metadata = {
 import { ClerkProvider } from '@clerk/nextjs'
 
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 
 export default function RootLayout({
   children,
@@ -123,6 +124,7 @@ export default function RootLayout({
           {children}
           <Analytics />
           <Toaster />
+          <SonnerToaster />
         </body>
       </html>
     </ClerkProvider>

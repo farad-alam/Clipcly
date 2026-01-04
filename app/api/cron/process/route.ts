@@ -51,26 +51,49 @@ export async function GET(req: NextRequest) {
         })
 
         // 4. Processing Logic
-        const { getVideoDownloadUrl } = await import('@/lib/tiktok')
-        const downloadUrl = await getVideoDownloadUrl(task.videoUrl)
+        const meta = task.videoMeta as any || {};
+        const mediaType = meta.mediaType || 'VIDEO'; // Default to VIDEO for backward compatibility
 
-        // B. Fetch Stream
-        const videoRes = await fetch(downloadUrl)
-        if (!videoRes.ok) throw new Error(`Failed to fetch video: ${videoRes.statusText}`)
-        const videoBuffer = await videoRes.arrayBuffer()
+        let publicUrl = '';
 
-        // C. Upload to Supabase (Direct Stream)
-        const fileName = `automation/${task.userId}/${Date.now()}-${task.id}.mp4`
-        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-            .from('posts') // Match existing bucket
-            .upload(fileName, videoBuffer, {
-                contentType: 'video/mp4',
-                upsert: true
-            })
+        if (mediaType === 'VIDEO') {
+            const { getVideoDownloadUrl } = await import('@/lib/tiktok')
+            const downloadUrl = await getVideoDownloadUrl(task.videoUrl)
 
-        if (uploadError) throw new Error(`Supabase Upload Error: ${uploadError.message}`)
+            // B. Fetch Stream
+            const videoRes = await fetch(downloadUrl)
+            if (!videoRes.ok) throw new Error(`Failed to fetch video: ${videoRes.statusText}`)
+            const videoBuffer = await videoRes.arrayBuffer()
 
-        const publicUrl = supabaseAdmin.storage.from('posts').getPublicUrl(fileName).data.publicUrl
+            // C. Upload to Supabase (Direct Stream)
+            const fileName = `automation/${task.userId}/${Date.now()}-${task.id}.mp4`
+            const { error: uploadError } = await supabaseAdmin.storage
+                .from('posts')
+                .upload(fileName, videoBuffer, {
+                    contentType: 'video/mp4',
+                    upsert: true
+                })
+
+            if (uploadError) throw new Error(`Supabase Upload Error: ${uploadError.message}`)
+            publicUrl = supabaseAdmin.storage.from('posts').getPublicUrl(fileName).data.publicUrl
+
+        } else if (mediaType === 'IMAGE') {
+            // Processing IMAGE
+            const imageRes = await fetch(task.videoUrl)
+            if (!imageRes.ok) throw new Error(`Failed to fetch image: ${imageRes.statusText}`)
+            const imageBuffer = await imageRes.arrayBuffer()
+
+            const fileName = `automation/${task.userId}/${Date.now()}-${task.id}.jpg`
+            const { error: uploadError } = await supabaseAdmin.storage
+                .from('posts')
+                .upload(fileName, imageBuffer, {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                })
+
+            if (uploadError) throw new Error(`Supabase Upload Error: ${uploadError.message}`)
+            publicUrl = supabaseAdmin.storage.from('posts').getPublicUrl(fileName).data.publicUrl
+        }
 
         // D. Get User's Instagram Account
         const account = await prisma.account.findFirst({
@@ -80,15 +103,29 @@ export async function GET(req: NextRequest) {
         if (!account) throw new Error("User has no connected Instagram account")
 
         // E. Publish to Instagram
-        const meta = task.videoMeta as any
-        const caption = `${meta.title || ''}\n\nCredit: @${meta.author || 'tiktok'} #reels`
+        const title = meta.title || meta.originalTitle || '';
+        const author = meta.author || 'unknown';
 
-        const creationId = await InstagramClient.publishReel(
-            account.instagramId,
-            publicUrl,
-            caption,
-            account.accessToken
-        )
+        // Construct caption
+        const caption = `${title}\n\nCredit: @${author} #${mediaType === 'IMAGE' ? 'pinterest' : 'reels'}`
+
+        let creationId = '';
+
+        if (mediaType === 'VIDEO') {
+            creationId = await InstagramClient.publishReel(
+                account.instagramId,
+                publicUrl,
+                caption,
+                account.accessToken
+            )
+        } else {
+            creationId = await InstagramClient.publishImage(
+                account.instagramId,
+                publicUrl,
+                caption,
+                account.accessToken
+            )
+        }
 
         // 5. Success
         await prisma.automationQueue.update({
@@ -105,7 +142,7 @@ export async function GET(req: NextRequest) {
                 userId: task.userId,
                 caption: caption,
                 imageUrls: [publicUrl],
-                mediaType: 'REEL',
+                mediaType: mediaType,
                 status: 'PUBLISHED',
                 instagramPostId: creationId,
                 scheduledAt: task.scheduledAt
